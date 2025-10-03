@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 
 export default function App() {
   const [players, setPlayers] = useState([{ name: 'Player 1', score: 0 }]);
@@ -8,6 +8,9 @@ export default function App() {
   const [allowMultipleImpostors, setAllowMultipleImpostors] = useState(false);
   const [giveImpostorFakeWord, setGiveImpostorFakeWord] = useState(true);
 
+  // Generation status
+  const [genDone, setGenDone] = useState(false);
+
   // Round setup
   const [category, setCategory] = useState('');
   const [secretWord, setSecretWord] = useState('');
@@ -15,8 +18,11 @@ export default function App() {
   const [fakeWordCandidate, setFakeWordCandidate] = useState(null);
 
   // Assigned per round
-  const [roundAssignments, setRoundAssignments] = useState([]); // [{name, role:'word'|'impostor', word?, fakeWord?, hint}]
-  const [phase, setPhase] = useState('setup'); // 'setup' | 'round-setup' | 'reveal' | 'score' | 'between-rounds'
+  // role: 'word' | 'impostor'
+  // word: secretWord (for word holders)
+  // fakeWord: (for impostor when giveImpostorFakeWord === true)
+  const [roundAssignments, setRoundAssignments] = useState([]);
+  const [phase, setPhase] = useState('setup');
 
   // Reveal sequence
   const [revealIndex, setRevealIndex] = useState(0);
@@ -49,6 +55,7 @@ export default function App() {
     setHintVisible(false);
     setVotedPlayerIndex(-1);
     setImpostorGuessedCorrectly(false);
+    setGenDone(false);
   }
 
   function startRoundSetup() {
@@ -62,6 +69,11 @@ export default function App() {
 
   async function generateWordAndHintFromCategory(cat) {
     try {
+      setGenDone(false);
+      setSecretWord('');
+      setVagueHint('');
+      setFakeWordCandidate(null);
+
       const r = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -75,17 +87,19 @@ export default function App() {
       const data = await r.json();
       setSecretWord(data.word || 'aurora');
       setVagueHint(data.hint || 'Common but not obvious');
-      setFakeWordCandidate(data.fakeWord || null);
+      setFakeWordCandidate(data.fakeWord ?? null);
+      setGenDone(true);
     } catch (e) {
       console.error(e);
       setSecretWord('aurora');
       setVagueHint('Common but not the first guess');
       setFakeWordCandidate(null);
+      setGenDone(true); // still allow proceeding for local demo
     }
   }
 
   function assignRolesAndBeginReveal() {
-    if (!secretWord) {
+    if (!genDone || !secretWord) {
       alert('Generate the word & hint first.');
       return;
     }
@@ -98,7 +112,7 @@ export default function App() {
       impostors.push(shuffled[0]); // at least 1
       let p = 0.35; // base chance for an extra impostor
       for (let i = 1; i < shuffled.length; i++) {
-        p *= 0.5; // continuously less likely
+        p *= 0.5;
         if (Math.random() < p) impostors.push(shuffled[i]);
       }
     } else {
@@ -110,7 +124,7 @@ export default function App() {
         return {
           name: p.name,
           role: 'impostor',
-          fakeWord: giveImpostorFakeWord ? fakeWordCandidate : null,
+          fakeWord: giveImpostorFakeWord ? (fakeWordCandidate || '—') : null,
           hint: vagueHint
         };
       } else {
@@ -132,8 +146,13 @@ export default function App() {
       setCurrentRevealed(false);
       setHintVisible(false);
     } else {
-      setPhase('score');
+      // Finished reveals; gate scoring behind a click
+      setPhase('gate-score');
     }
+  }
+
+  function enterScoring() {
+    setPhase('score');
   }
 
   function commitScores() {
@@ -157,7 +176,6 @@ export default function App() {
         });
       }
       if (impostorGuessedCorrectly) {
-        // Impostor bonus +1 (all impostors share in multi mode)
         impostorIndexes.forEach((idx) => {
           updated[idx].score += 1;
         });
@@ -226,7 +244,7 @@ export default function App() {
                 </div>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'end' }}>
                   <button className="btn" onClick={() => generateWordAndHintFromCategory(category)}>
-                    Generate Word & Hint
+                    Generate Word &amp; Hint
                   </button>
                   <button
                     className="btn-subtle"
@@ -234,6 +252,7 @@ export default function App() {
                       setSecretWord('');
                       setVagueHint('');
                       setFakeWordCandidate(null);
+                      setGenDone(false);
                     }}
                   >
                     Clear
@@ -242,15 +261,13 @@ export default function App() {
               </div>
 
               <div style={{ marginTop: 8, fontSize: 12, opacity: 0.9 }}>
-                <div>
-                  <b>Secret Word:</b> {secretWord || <em style={{ opacity: 0.6 }}>(not generated)</em>}
-                </div>
-                <div>
-                  <b>Vague Hint:</b> {vagueHint || <em style={{ opacity: 0.6 }}>(not generated)</em>}
-                </div>
-                {giveImpostorFakeWord && (
+                {genDone ? (
+                  <div style={{ color: '#3be89e' }}>
+                    <b>Successful generation.</b> Ready to assign roles.
+                  </div>
+                ) : (
                   <div>
-                    <b>Fake Word (for impostor):</b> {fakeWordCandidate || <em style={{ opacity: 0.6 }}>(not generated)</em>}
+                    <em style={{ opacity: 0.6 }}>(not generated)</em>
                   </div>
                 )}
               </div>
@@ -262,15 +279,24 @@ export default function App() {
                   onChange={setAllowMultipleImpostors}
                 />
                 <Toggle
-                  label="Give impostor a fake word"
+                  label="Give impostor a fake word (keeps UI identical)"
                   checked={giveImpostorFakeWord}
                   onChange={setGiveImpostorFakeWord}
                 />
               </div>
 
               <div style={{ marginTop: 16 }}>
-                <button className="btn" onClick={assignRolesAndBeginReveal} disabled={!secretWord}>
-                  Assign Roles & Start Reveal
+                <button
+                  className="btn"
+                  onClick={assignRolesAndBeginReveal}
+                  disabled={!genDone}
+                  style={{
+                    background: genDone ? '#19a974' : '#4b5563',
+                    color: genDone ? 'white' : '#cbd5e1',
+                    cursor: genDone ? 'pointer' : 'not-allowed'
+                  }}
+                >
+                  Assign Roles &amp; Start Reveal
                 </button>
               </div>
 
@@ -290,6 +316,7 @@ export default function App() {
                 hintVisible={hintVisible}
                 onReveal={() => setCurrentRevealed(true)}
                 onShowHint={() => setHintVisible(true)}
+                giveImpostorFakeWord={giveImpostorFakeWord}
               />
               <button className="btn" onClick={nextRevealStep}>
                 {revealIndex < roundAssignments.length - 1
@@ -297,7 +324,7 @@ export default function App() {
                     ? 'Pass to Next Player'
                     : 'Reveal'
                   : currentRevealed
-                  ? 'Continue to Scoring'
+                  ? 'Continue'
                   : 'Reveal'}
               </button>
             </div>
@@ -320,6 +347,10 @@ export default function App() {
               ))}
             </div>
           </Card>
+        )}
+
+        {phase === 'gate-score' && (
+          <GateOverlay onContinue={enterScoring} />
         )}
 
         {phase === 'score' && (
@@ -353,8 +384,9 @@ export default function App() {
                 </button>
               </div>
 
-              <div>
-                <RoundSummary assignments={roundAssignments} secretWord={secretWord} />
+              {/* NOTE: Removed spoiler summary to avoid leaking roles/secret word */}
+              <div style={{ border: '1px dashed #2a3b63', borderRadius: 12, padding: 12, background: '#0f1a33', opacity: 0.7 }}>
+                No spoilers shown here. Use votes and the impostor guess toggle to score.
               </div>
             </div>
           </Card>
@@ -515,8 +547,36 @@ function Toggle({ label, checked, onChange }) {
   );
 }
 
-function RevealCard({ assignment, revealed, hintVisible, onReveal, onShowHint }) {
+/**
+ * RevealCard rules:
+ * - If giveImpostorFakeWord === true:
+ *   - UI is identical for all players. Everyone sees "Your secret word".
+ *   - Word holders see the real secret word; the impostor sees fakeWord.
+ *   - No hint button for anyone.
+ * - If giveImpostorFakeWord === false:
+ *   - Word holders: see secret word, NO hint button.
+ *   - Impostor: sees "You are the Impostor" and CAN use the hint button.
+ */
+function RevealCard({
+  assignment,
+  revealed,
+  hintVisible,
+  onReveal,
+  onShowHint,
+  giveImpostorFakeWord
+}) {
   if (!assignment) return null;
+
+  const isImpostor = assignment.role === 'impostor';
+  const showIdenticalUI = giveImpostorFakeWord === true;
+
+  // What word to show under identical UI mode
+  const displayWord = isImpostor ? assignment.fakeWord : assignment.word;
+
+  // Hint visibility rules
+  const canShowHintButton =
+    !showIdenticalUI && isImpostor; // only impostor gets hint when fake-word mode is OFF
+
   return (
     <div style={{ width: '100%', maxWidth: 420 }}>
       <div style={{ border: '1px solid #1f2b45', background: '#0f1a33', borderRadius: 16, padding: 16, textAlign: 'center' }}>
@@ -531,16 +591,34 @@ function RevealCard({ assignment, revealed, hintVisible, onReveal, onShowHint })
           </>
         ) : (
           <>
-            {assignment.role === 'impostor' ? (
+            {showIdenticalUI ? (
+              // Identical UI for everyone: "Your secret word" label, impostor quietly sees fake word
+              <div>
+                <div style={{ fontSize: 12, opacity: 0.8 }}>Your secret word:</div>
+                <div style={{ fontSize: 22, fontWeight: 700, color: '#3be89e', fontFamily: 'monospace' }}>
+                  {displayWord || '—'}
+                </div>
+              </div>
+            ) : isImpostor ? (
+              // Impostor clearly labeled only when fake-word mode is OFF
               <div>
                 <div style={{ fontSize: 22, fontWeight: 700, color: '#ffb6c1' }}>You are the Impostor</div>
-                {assignment.fakeWord && (
-                  <div style={{ fontSize: 13, opacity: 0.8, marginTop: 6 }}>
-                    Fake word: <span style={{ fontFamily: 'monospace' }}>{assignment.fakeWord}</span>
-                  </div>
-                )}
+                <div style={{ marginTop: 10 }}>
+                  {!hintVisible ? (
+                    canShowHintButton ? (
+                      <button className="btn-subtle" onClick={onShowHint}>
+                        Show Hint (optional)
+                      </button>
+                    ) : null
+                  ) : (
+                    <div style={{ fontSize: 13, opacity: 0.85 }}>
+                      Hint: <span style={{ opacity: 1 }}>{assignment.hint}</span>
+                    </div>
+                  )}
+                </div>
               </div>
             ) : (
+              // Word holder (fake-word mode OFF)
               <div>
                 <div style={{ fontSize: 12, opacity: 0.8 }}>Your secret word:</div>
                 <div style={{ fontSize: 22, fontWeight: 700, color: '#3be89e', fontFamily: 'monospace' }}>
@@ -548,17 +626,6 @@ function RevealCard({ assignment, revealed, hintVisible, onReveal, onShowHint })
                 </div>
               </div>
             )}
-            <div style={{ marginTop: 10 }}>
-              {!hintVisible ? (
-                <button className="btn-subtle" onClick={onShowHint}>
-                  Show Hint (optional)
-                </button>
-              ) : (
-                <div style={{ fontSize: 13, opacity: 0.85 }}>
-                  Hint: <span style={{ opacity: 1 }}>{assignment.hint}</span>
-                </div>
-              )}
-            </div>
           </>
         )}
       </div>
@@ -594,22 +661,25 @@ function Scoreboard({ players }) {
   );
 }
 
-function RoundSummary({ assignments, secretWord }) {
+function GateOverlay({ onContinue }) {
   return (
-    <div style={{ border: '1px solid #1f2b45', borderRadius: 12, padding: 12, background: '#0f1a33' }}>
-      <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 6 }}>Round Summary</div>
-      <div style={{ fontSize: 13 }}>
-        Secret word was:{' '}
-        <b style={{ fontFamily: 'monospace', color: '#3be89e' }}>{secretWord}</b>
+    <div className="gate" style={{
+      position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+      background: 'rgba(0,0,0,0.7)', zIndex: 50
+    }}>
+      <div style={{ background: '#ffffff', color: '#0b1221', padding: 20, borderRadius: 16, width: 'min(560px, 92vw)' }}>
+        <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 6 }}>Round complete</h2>
+        <p style={{ fontSize: 13, opacity: 0.8, marginBottom: 12 }}>
+          Click continue to open the scoring screen. Roles and the secret word will not be shown.
+        </p>
+        <button
+          className="btn"
+          onClick={onContinue}
+          style={{ background: '#2563eb' }}
+        >
+          Continue to Scoring
+        </button>
       </div>
-      <ul style={{ marginTop: 8, fontSize: 13 }}>
-        {assignments.map((a, idx) => (
-          <li key={idx}>
-            <b>{a.name}</b>: {a.role === 'impostor' ? 'Impostor' : 'Word Holder'}
-            {a.role === 'impostor' && a.fakeWord ? <span style={{ opacity: 0.7 }}> (fake: {a.fakeWord})</span> : null}
-          </li>
-        ))}
-      </ul>
     </div>
   );
 }
