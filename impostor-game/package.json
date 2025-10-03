@@ -1,0 +1,9 @@
+{
+  "name": "impostor-game",
+  "private": true,
+  "workspaces": ["server", "web"],
+  "scripts": {
+    "postinstall": "npm --prefix server i && npm --prefix web i",
+    "dev": "npm --prefix server run dev & npm --prefix web run dev"
+  }
+}
