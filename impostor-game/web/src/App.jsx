@@ -87,6 +87,138 @@ export default function App() {
     [roundAssignments]
   );
 
+  // ---------------- PERSISTENCE ----------------
+  // Load saved state on mount (best-effort, ignore parse errors)
+  React.useEffect(() => {
+    try {
+      const raw = localStorage.getItem('impostorGame:v1');
+      if (!raw) return;
+      const saved = JSON.parse(raw);
+      if (saved && typeof saved === 'object') {
+        if (Array.isArray(saved.players)) setPlayers(saved.players);
+        if (typeof saved.newPlayerName === 'string') setNewPlayerName(saved.newPlayerName);
+        if (typeof saved.allowMultipleImpostors === 'boolean') setAllowMultipleImpostors(saved.allowMultipleImpostors);
+        if (typeof saved.giveImpostorFakeWord === 'boolean') setGiveImpostorFakeWord(saved.giveImpostorFakeWord);
+        if (typeof saved.category === 'string') setCategory(saved.category);
+        if (typeof saved.secretWord === 'string') setSecretWord(saved.secretWord);
+        if (typeof saved.vagueHint === 'string') setVagueHint(saved.vagueHint);
+        if (saved.fakeWordCandidate === null || typeof saved.fakeWordCandidate === 'string') setFakeWordCandidate(saved.fakeWordCandidate);
+        if (Array.isArray(saved.roundAssignments)) setRoundAssignments(saved.roundAssignments);
+        if (typeof saved.phase === 'string') setPhase(saved.phase);
+        if (typeof saved.revealIndex === 'number') setRevealIndex(saved.revealIndex);
+        if (typeof saved.currentRevealed === 'boolean') setCurrentRevealed(saved.currentRevealed);
+        if (typeof saved.hintVisible === 'boolean') setHintVisible(saved.hintVisible);
+        if (typeof saved.votedPlayerIndex === 'number') setVotedPlayerIndex(saved.votedPlayerIndex);
+        if (typeof saved.impostorGuessedCorrectly === 'boolean') setImpostorGuessedCorrectly(saved.impostorGuessedCorrectly);
+        if (typeof saved.genDone === 'boolean') setGenDone(saved.genDone);
+        if (typeof saved.isDarkMode === 'boolean') setIsDarkMode(saved.isDarkMode);
+      }
+    } catch {}
+  }, []);
+
+  // Save relevant state whenever it changes
+  React.useEffect(() => {
+    try {
+      const data = {
+        players,
+        newPlayerName,
+        allowMultipleImpostors,
+        giveImpostorFakeWord,
+        category,
+        secretWord,
+        vagueHint,
+        fakeWordCandidate,
+        roundAssignments,
+        phase,
+        revealIndex,
+        currentRevealed,
+        hintVisible,
+        votedPlayerIndex,
+        impostorGuessedCorrectly,
+        genDone,
+        isDarkMode
+      };
+      localStorage.setItem('impostorGame:v1', JSON.stringify(data));
+    } catch {}
+  }, [
+    players,
+    newPlayerName,
+    allowMultipleImpostors,
+    giveImpostorFakeWord,
+    category,
+    secretWord,
+    vagueHint,
+    fakeWordCandidate,
+    roundAssignments,
+    phase,
+    revealIndex,
+    currentRevealed,
+    hintVisible,
+    votedPlayerIndex,
+    impostorGuessedCorrectly,
+    genDone,
+    isDarkMode
+  ]);
+
+  // Save before the page is hidden or unloaded (mobile or OS suspend)
+  React.useEffect(() => {
+    const saveNow = () => {
+      try {
+        const data = {
+          players,
+          newPlayerName,
+          allowMultipleImpostors,
+          giveImpostorFakeWord,
+          category,
+          secretWord,
+          vagueHint,
+          fakeWordCandidate,
+          roundAssignments,
+          phase,
+          revealIndex,
+          currentRevealed,
+          hintVisible,
+          votedPlayerIndex,
+          impostorGuessedCorrectly,
+          genDone,
+          isDarkMode
+        };
+        localStorage.setItem('impostorGame:v1', JSON.stringify(data));
+      } catch {}
+    };
+    const onVis = () => {
+      if (document.visibilityState !== 'visible') saveNow();
+    };
+    const onPageHide = () => saveNow();
+    const onBeforeUnload = () => saveNow();
+    document.addEventListener('visibilitychange', onVis);
+    window.addEventListener('pagehide', onPageHide);
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => {
+      document.removeEventListener('visibilitychange', onVis);
+      window.removeEventListener('pagehide', onPageHide);
+      window.removeEventListener('beforeunload', onBeforeUnload);
+    };
+  }, [
+    players,
+    newPlayerName,
+    allowMultipleImpostors,
+    giveImpostorFakeWord,
+    category,
+    secretWord,
+    vagueHint,
+    fakeWordCandidate,
+    roundAssignments,
+    phase,
+    revealIndex,
+    currentRevealed,
+    hintVisible,
+    votedPlayerIndex,
+    impostorGuessedCorrectly,
+    genDone,
+    isDarkMode
+  ]);
+
   function addPlayer() {
     const name = newPlayerName.trim();
     if (!name) return;

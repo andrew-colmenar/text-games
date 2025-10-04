@@ -55,8 +55,8 @@ Some more examples:
       `Category: ${category}\n` +
       `Options: allowMultipleImpostors=${allowMultipleImpostors}, giveImpostorFakeWord=${giveImpostorFakeWord}`;
 
-    // ✅ Chat Completions with JSON-mode response_format
-    const chat = await client.chat.completions.create({
+
+      const chat = await client.chat.completions.create({
       model: 'gpt-4o-mini',                 // pick any chat model that supports JSON response_format
       response_format: { type: 'json_object' },
       messages: [
