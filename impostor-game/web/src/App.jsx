@@ -1,36 +1,61 @@
 import React, { useMemo, useState } from 'react';
 
 export default function App() {
+  // ---------------- THEME MODE STATE ----------------
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
   // ---------------- UI THEME ----------------
   // Centralized tokens for color, radius, spacing, shadows, etc.
+  const lightColors = {
+    bg: '#f5f7fa',
+    surface: '#ffffff',
+    surfaceSoft: '#fafbfc',
+    border: '#e1e6ed',
+    text: '#2d3748',
+    muted: '#718096',
+    accent: '#4fd1c5',
+    accentMuted: '#38b2ac',
+    primary: '#5b8def',
+    warn: '#f56565',
+    disabledBg: '#e2e8f0',
+    disabledText: '#a0aec0',
+    subtleBtnBg: '#f7fafc',
+    subtleBtnText: '#4a5568',
+    subtleBtnHover: '#edf2f7'
+  };
+
+  const darkColors = {
+    bg: '#1a202c',
+    surface: '#2d3748',
+    surfaceSoft: '#252d3a',
+    border: '#4a5568',
+    text: '#e2e8f0',
+    muted: '#a0aec0',
+    accent: '#4fd1c5',
+    accentMuted: '#38b2ac',
+    primary: '#5b8def',
+    warn: '#fc8181',
+    disabledBg: '#4a5568',
+    disabledText: '#718096',
+    subtleBtnBg: '#374151',
+    subtleBtnText: '#cbd5e0',
+    subtleBtnHover: '#4a5568'
+  };
+
   const theme = {
     font: {
       family: `Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"`,
       size: { xs: 11, sm: 13, md: 15, lg: 18, xl: 28, xxl: 32 },
       weight: { reg: 400, med: 500, bold: 700 }
     },
-    color: {
-      bg: '#f5f7fa',
-      surface: '#ffffff',
-      surfaceSoft: '#fafbfc',
-      border: '#e1e6ed',
-      text: '#2d3748',
-      muted: '#718096',
-      accent: '#4fd1c5',
-      accentMuted: '#38b2ac',
-      primary: '#5b8def',
-      warn: '#f56565',
-      disabledBg: '#e2e8f0',
-      disabledText: '#a0aec0',
-      subtleBtnBg: '#f7fafc',
-      subtleBtnText: '#4a5568'
-    },
+    color: isDarkMode ? darkColors : lightColors,
     radius: { sm: 10, md: 12, lg: 16, xl: 20 },
     shadow: {
-      md: '0 4px 20px rgba(0,0,0,0.08)',
-      sm: '0 2px 8px rgba(0,0,0,0.06)'
+      md: isDarkMode ? '0 4px 20px rgba(0,0,0,0.3)' : '0 4px 20px rgba(0,0,0,0.08)',
+      sm: isDarkMode ? '0 2px 8px rgba(0,0,0,0.2)' : '0 2px 8px rgba(0,0,0,0.06)'
     },
-    spacing: (n) => `${n * 8}px`
+    spacing: (n) => `${n * 8}px`,
+    isDark: isDarkMode
   };
 
   // ---------------- GAME STATE (UNCHANGED LOGIC) ----------------
@@ -218,9 +243,9 @@ export default function App() {
 
   // ---------------- RENDER ----------------
   return (
-    <div style={{ background: theme.color.bg, color: theme.color.text, minHeight: '100vh', fontFamily: theme.font.family }}>
+    <div style={{ background: theme.color.bg, color: theme.color.text, minHeight: '100vh', fontFamily: theme.font.family, transition: 'background 200ms ease' }}>
       <div style={{ maxWidth: 1040, margin: '0 auto', padding: theme.spacing(3) }}>
-        <Header theme={theme} />
+        <Header theme={theme} isDarkMode={isDarkMode} toggleTheme={() => setIsDarkMode(!isDarkMode)} />
 
         {phase === 'setup' && (
           <Card theme={theme} title="Players & Scores">
@@ -318,9 +343,6 @@ export default function App() {
                 </Button>
               </div>
 
-              <p style={{ marginTop: theme.spacing(1), fontSize: theme.font.size.xs, opacity: 0.7 }}>
-                The generator calls the backend at <code>/api/generate</code>.
-              </p>
             </Card>
           </>
         )}
@@ -457,7 +479,7 @@ export default function App() {
         )}
 
         <footer style={{ marginTop: theme.spacing(5), fontSize: theme.font.size.xs, opacity: 0.7 }}>
-          Local demo. Pass the laptop for private reveals. Keys stay on your server.
+          Local demo. Pass the laptop for private reveals.
         </footer>
       </div>
 
@@ -479,9 +501,9 @@ export default function App() {
 
 /* ---------------- SMALL UI PRIMITIVES ---------------- */
 
-function Header({ theme }) {
+function Header({ theme, isDarkMode, toggleTheme }) {
   return (
-    <div className="fade-in" style={{ marginBottom: theme.spacing(2.5) }}>
+    <div className="fade-in" style={{ marginBottom: theme.spacing(2.5), display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
       <h1
         style={{
           fontSize: theme.font.size.xl,
@@ -504,6 +526,27 @@ function Header({ theme }) {
         />
         Impostor Game – Local Demo
       </h1>
+      <button
+        onClick={toggleTheme}
+        style={{
+          padding: '8px 14px',
+          borderRadius: theme.radius.md,
+          background: theme.color.subtleBtnBg,
+          color: theme.color.subtleBtnText,
+          border: `1px solid ${theme.color.border}`,
+          cursor: 'pointer',
+          fontWeight: theme.font.weight.med,
+          fontSize: theme.font.size.sm,
+          transition: 'background 120ms ease',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6
+        }}
+        onMouseEnter={(e) => (e.currentTarget.style.background = theme.color.subtleBtnHover)}
+        onMouseLeave={(e) => (e.currentTarget.style.background = theme.color.subtleBtnBg)}
+      >
+        {isDarkMode ? '☀️' : '🌙'} {isDarkMode ? 'Light' : 'Dark'}
+      </button>
     </div>
   );
 }
@@ -577,7 +620,7 @@ function ButtonSubtle({ theme, children, onClick, style }) {
         transition: 'background 120ms ease',
         ...style
       }}
-      onMouseEnter={(e) => (e.currentTarget.style.background = '#172442')}
+      onMouseEnter={(e) => (e.currentTarget.style.background = theme.color.subtleBtnHover)}
       onMouseLeave={(e) => (e.currentTarget.style.background = theme.color.subtleBtnBg)}
     >
       {children}
