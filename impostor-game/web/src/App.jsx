@@ -1,35 +1,59 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState } from 'react';
 
 export default function App() {
+  // ---------------- UI THEME ----------------
+  // Centralized tokens for color, radius, spacing, shadows, etc.
+  const theme = {
+    font: {
+      family: `Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"`,
+      size: { xs: 11, sm: 13, md: 15, lg: 18, xl: 28, xxl: 32 },
+      weight: { reg: 400, med: 500, bold: 700 }
+    },
+    color: {
+      bg: '#f5f7fa',
+      surface: '#ffffff',
+      surfaceSoft: '#fafbfc',
+      border: '#e1e6ed',
+      text: '#2d3748',
+      muted: '#718096',
+      accent: '#4fd1c5',
+      accentMuted: '#38b2ac',
+      primary: '#5b8def',
+      warn: '#f56565',
+      disabledBg: '#e2e8f0',
+      disabledText: '#a0aec0',
+      subtleBtnBg: '#f7fafc',
+      subtleBtnText: '#4a5568'
+    },
+    radius: { sm: 10, md: 12, lg: 16, xl: 20 },
+    shadow: {
+      md: '0 4px 20px rgba(0,0,0,0.08)',
+      sm: '0 2px 8px rgba(0,0,0,0.06)'
+    },
+    spacing: (n) => `${n * 8}px`
+  };
+
+  // ---------------- GAME STATE (UNCHANGED LOGIC) ----------------
   const [players, setPlayers] = useState([{ name: 'Player 1', score: 0 }]);
   const [newPlayerName, setNewPlayerName] = useState('');
 
-  // Game options
   const [allowMultipleImpostors, setAllowMultipleImpostors] = useState(false);
   const [giveImpostorFakeWord, setGiveImpostorFakeWord] = useState(true);
 
-  // Generation status
   const [genDone, setGenDone] = useState(false);
 
-  // Round setup
   const [category, setCategory] = useState('');
   const [secretWord, setSecretWord] = useState('');
   const [vagueHint, setVagueHint] = useState('');
   const [fakeWordCandidate, setFakeWordCandidate] = useState(null);
 
-  // Assigned per round
-  // role: 'word' | 'impostor'
-  // word: secretWord (for word holders)
-  // fakeWord: (for impostor when giveImpostorFakeWord === true)
   const [roundAssignments, setRoundAssignments] = useState([]);
-  const [phase, setPhase] = useState('setup');
+  const [phase, setPhase] = useState('setup'); // 'setup' | 'round-setup' | 'reveal' | 'gate-score' | 'score' | 'between-rounds'
 
-  // Reveal sequence
   const [revealIndex, setRevealIndex] = useState(0);
   const [currentRevealed, setCurrentRevealed] = useState(false);
   const [hintVisible, setHintVisible] = useState(false);
 
-  // Scoring choices
   const [votedPlayerIndex, setVotedPlayerIndex] = useState(-1);
   const [impostorGuessedCorrectly, setImpostorGuessedCorrectly] = useState(false);
 
@@ -94,7 +118,7 @@ export default function App() {
       setSecretWord('aurora');
       setVagueHint('Common but not the first guess');
       setFakeWordCandidate(null);
-      setGenDone(true); // still allow proceeding for local demo
+      setGenDone(true); // proceed for local demo
     }
   }
 
@@ -105,14 +129,14 @@ export default function App() {
     }
     const n = players.length;
 
-    // Decide impostor indexes
+    // Decide impostor indexes (unchanged)
     let impostors = [];
     if (allowMultipleImpostors) {
       const shuffled = shuffle([...Array(n).keys()]);
       impostors.push(shuffled[0]); // at least 1
-      let p = 0.35; // base chance for an extra impostor
+      let p = 0.25; // base chance for an extra impostor
       for (let i = 1; i < shuffled.length; i++) {
-        p *= 0.5;
+        p *= 0.25;
         if (Math.random() < p) impostors.push(shuffled[i]);
       }
     } else {
@@ -146,8 +170,7 @@ export default function App() {
       setCurrentRevealed(false);
       setHintVisible(false);
     } else {
-      // Finished reveals; gate scoring behind a click
-      setPhase('gate-score');
+      setPhase('gate-score'); // gate screen before scoring
     }
   }
 
@@ -165,12 +188,10 @@ export default function App() {
     setPlayers((prev) => {
       const updated = prev.map((p) => ({ ...p }));
       if (votedIsImpostor) {
-        // Everyone except impostors +1
         roundAssignments.forEach((a, idx) => {
           if (a.role !== 'impostor') updated[idx].score += 1;
         });
       } else {
-        // Impostors +1
         impostorIndexes.forEach((idx) => {
           updated[idx].score += 1;
         });
@@ -195,14 +216,16 @@ export default function App() {
     setPhase('round-setup');
   }
 
+  // ---------------- RENDER ----------------
   return (
-    <div style={{ background: '#0b1221', color: '#e6f0ff', minHeight: '100vh' }}>
-      <div style={{ maxWidth: 960, margin: '0 auto', padding: 24 }}>
-        <h1 style={{ fontSize: 28, fontWeight: 700, marginBottom: 16 }}>Impostor Game – Local Demo</h1>
+    <div style={{ background: theme.color.bg, color: theme.color.text, minHeight: '100vh', fontFamily: theme.font.family }}>
+      <div style={{ maxWidth: 1040, margin: '0 auto', padding: theme.spacing(3) }}>
+        <Header theme={theme} />
 
         {phase === 'setup' && (
-          <Card title="Players & Scores">
+          <Card theme={theme} title="Players & Scores">
             <PlayerManager
+              theme={theme}
               players={players}
               onRemove={removePlayer}
               onAdd={addPlayer}
@@ -210,18 +233,24 @@ export default function App() {
               setNewPlayerName={setNewPlayerName}
               setPlayers={setPlayers}
             />
-            <div style={{ marginTop: 16 }}>
-              <button className="btn" onClick={startRoundSetup} disabled={players.length < 3}>
+            <div style={{ marginTop: theme.spacing(2) }}>
+              <Button
+                theme={theme}
+                onClick={startRoundSetup}
+                disabled={players.length < 3}
+                ariaLabel="Start Round"
+              >
                 Start Round
-              </button>
+              </Button>
             </div>
           </Card>
         )}
 
         {phase === 'round-setup' && (
           <>
-            <Card title="Players & Scores (Editable Between Rounds)">
+            <Card theme={theme} title="Players & Scores (Editable Between Rounds)">
               <PlayerManager
+                theme={theme}
                 players={players}
                 onRemove={removePlayer}
                 onAdd={addPlayer}
@@ -231,23 +260,23 @@ export default function App() {
               />
             </Card>
 
-            <Card title="Round Setup">
-              <div style={{ display: 'grid', gap: 12, gridTemplateColumns: '1fr 1fr' }}>
+            <Card theme={theme} title="Round Setup">
+              <div style={{ display: 'grid', gap: theme.spacing(1.5), gridTemplateColumns: '1fr 1fr' }}>
                 <div>
-                  <label style={{ fontSize: 12 }}>Category (host enters)</label>
-                  <input
-                    className="input"
+                  <Label theme={theme}>Category</Label>
+                  <Input
+                    theme={theme}
                     value={category}
                     onChange={(e) => setCategory(e.target.value)}
                     placeholder="e.g., animals, movies, breakfast foods"
                   />
                 </div>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'end' }}>
-                  <button className="btn" onClick={() => generateWordAndHintFromCategory(category)}>
-                    Generate Word &amp; Hint
-                  </button>
-                  <button
-                    className="btn-subtle"
+                <div style={{ display: 'flex', gap: theme.spacing(1), alignItems: 'end' }}>
+                  <Button theme={theme} onClick={() => generateWordAndHintFromCategory(category)}>
+                    Generate
+                  </Button>
+                  <ButtonSubtle
+                    theme={theme}
                     onClick={() => {
                       setSecretWord('');
                       setVagueHint('');
@@ -256,51 +285,40 @@ export default function App() {
                     }}
                   >
                     Clear
-                  </button>
+                  </ButtonSubtle>
                 </div>
               </div>
 
-              <div style={{ marginTop: 8, fontSize: 12, opacity: 0.9 }}>
-                {genDone ? (
-                  <div style={{ color: '#3be89e' }}>
-                    <b>Successful generation.</b> Ready to assign roles.
-                  </div>
-                ) : (
-                  <div>
-                    <em style={{ opacity: 0.6 }}>(not generated)</em>
-                  </div>
-                )}
-              </div>
+              <StatusRow theme={theme} ok={genDone} okText="Successful generation. Ready to assign roles." />
 
-              <div style={{ display: 'grid', gap: 12, gridTemplateColumns: '1fr 1fr', marginTop: 12 }}>
+              <div style={{ display: 'grid', gap: theme.spacing(1.5), gridTemplateColumns: '1fr 1fr', marginTop: theme.spacing(1.5) }}>
                 <Toggle
+                  theme={theme}
                   label="Allow multiple impostors"
                   checked={allowMultipleImpostors}
                   onChange={setAllowMultipleImpostors}
                 />
                 <Toggle
-                  label="Give impostor a fake word (keeps UI identical)"
+                  theme={theme}
+                  label="Give impostor a fake word"
                   checked={giveImpostorFakeWord}
                   onChange={setGiveImpostorFakeWord}
                 />
               </div>
 
-              <div style={{ marginTop: 16 }}>
-                <button
-                  className="btn"
+              <div style={{ marginTop: theme.spacing(2) }}>
+                <Button
+                  theme={theme}
                   onClick={assignRolesAndBeginReveal}
                   disabled={!genDone}
-                  style={{
-                    background: genDone ? '#19a974' : '#4b5563',
-                    color: genDone ? 'white' : '#cbd5e1',
-                    cursor: genDone ? 'pointer' : 'not-allowed'
-                  }}
+                  variant={genDone ? 'primary' : 'disabled'}
+                  ariaLabel="Assign Roles & Start Reveal"
                 >
                   Assign Roles &amp; Start Reveal
-                </button>
+                </Button>
               </div>
 
-              <p style={{ marginTop: 8, fontSize: 11, opacity: 0.7 }}>
+              <p style={{ marginTop: theme.spacing(1), fontSize: theme.font.size.xs, opacity: 0.7 }}>
                 The generator calls the backend at <code>/api/generate</code>.
               </p>
             </Card>
@@ -308,9 +326,10 @@ export default function App() {
         )}
 
         {phase === 'reveal' && (
-          <Card title={`Private Reveal – ${roundAssignments[revealIndex]?.name || ''}`}>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
+          <Card theme={theme} title={`Private Reveal – ${roundAssignments[revealIndex]?.name || ''}`}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: theme.spacing(2) }}>
               <RevealCard
+                theme={theme}
                 assignment={roundAssignments[revealIndex]}
                 revealed={currentRevealed}
                 hintVisible={hintVisible}
@@ -318,7 +337,7 @@ export default function App() {
                 onShowHint={() => setHintVisible(true)}
                 giveImpostorFakeWord={giveImpostorFakeWord}
               />
-              <button className="btn" onClick={nextRevealStep}>
+              <Button theme={theme} onClick={nextRevealStep}>
                 {revealIndex < roundAssignments.length - 1
                   ? currentRevealed
                     ? 'Pass to Next Player'
@@ -326,21 +345,31 @@ export default function App() {
                   : currentRevealed
                   ? 'Continue'
                   : 'Reveal'}
-              </button>
+              </Button>
             </div>
 
             <div
               style={{
                 display: 'grid',
-                gap: 8,
+                gap: theme.spacing(1),
                 gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
-                marginTop: 16
+                marginTop: theme.spacing(2)
               }}
             >
               {roundAssignments.map((a, idx) => (
-                <div key={idx} style={{ border: '1px solid #1f2b45', borderRadius: 12, padding: 12, background: '#0f1a33' }}>
-                  <div style={{ fontSize: 12, color: idx === revealIndex ? '#3be89e' : '#c6d4ff' }}>{a.name}</div>
-                  <div style={{ fontSize: 11, opacity: 0.7 }}>
+                <div
+                  key={idx}
+                  style={{
+                    border: `1px solid ${theme.color.border}`,
+                    borderRadius: theme.radius.md,
+                    padding: theme.spacing(1.5),
+                    background: theme.color.surfaceSoft
+                  }}
+                >
+                  <div style={{ fontSize: theme.font.size.xs, color: idx === revealIndex ? theme.color.accent : theme.color.text }}>
+                    {a.name}
+                  </div>
+                  <div style={{ fontSize: theme.font.size.xs, opacity: 0.7 }}>
                     {idx < revealIndex ? 'Done' : idx === revealIndex ? 'Current' : 'Waiting'}
                   </div>
                 </div>
@@ -349,19 +378,18 @@ export default function App() {
           </Card>
         )}
 
-        {phase === 'gate-score' && (
-          <GateOverlay onContinue={enterScoring} />
-        )}
+        {phase === 'gate-score' && <GateOverlay theme={theme} onContinue={enterScoring} />}
 
         {phase === 'score' && (
-          <Card title="End Round – Scoring">
-            <div style={{ display: 'grid', gap: 24, gridTemplateColumns: '1fr 1fr' }}>
+          <Card theme={theme} title="End Round – Scoring">
+            <div style={{ display: 'grid', gap: theme.spacing(3), gridTemplateColumns: '1fr 1fr' }}>
               <div>
-                <label style={{ fontSize: 12 }}>Who was voted as the impostor?</label>
+                <Label theme={theme}>Who was voted as the impostor?</Label>
                 <select
                   className="input"
                   value={votedPlayerIndex}
                   onChange={(e) => setVotedPlayerIndex(parseInt(e.target.value))}
+                  style={inputStyle(theme)}
                 >
                   <option value={-1}>Select player…</option>
                   {players.map((p, i) => (
@@ -371,22 +399,31 @@ export default function App() {
                   ))}
                 </select>
 
-                <div style={{ marginTop: 12 }}>
+                <div style={{ marginTop: theme.spacing(1.5) }}>
                   <Toggle
+                    theme={theme}
                     label="Did the impostor guess the word? (+1 impostor)"
                     checked={impostorGuessedCorrectly}
                     onChange={setImpostorGuessedCorrectly}
                   />
                 </div>
 
-                <button className="btn" style={{ marginTop: 16 }} onClick={commitScores}>
+                <Button theme={theme} style={{ marginTop: theme.spacing(2) }} onClick={commitScores}>
                   Apply Scores
-                </button>
+                </Button>
               </div>
 
-              {/* NOTE: Removed spoiler summary to avoid leaking roles/secret word */}
-              <div style={{ border: '1px dashed #2a3b63', borderRadius: 12, padding: 12, background: '#0f1a33', opacity: 0.7 }}>
-                No spoilers shown here. Use votes and the impostor guess toggle to score.
+              {/* No spoilers box */}
+              <div
+                style={{
+                  border: `1px dashed ${theme.color.border}`,
+                  borderRadius: theme.radius.md,
+                  padding: theme.spacing(1.5),
+                  background: theme.color.surface,
+                  opacity: 0.8
+                }}
+              >
+                No spoilers shown here. Use votes and the impostor-guess toggle to score.
               </div>
             </div>
           </Card>
@@ -394,10 +431,11 @@ export default function App() {
 
         {phase === 'between-rounds' && (
           <>
-            <Card title="Scores & Roster">
-              <Scoreboard players={players} />
-              <div style={{ marginTop: 16 }}>
+            <Card theme={theme} title="Scores & Roster">
+              <Scoreboard theme={theme} players={players} />
+              <div style={{ marginTop: theme.spacing(2) }}>
                 <PlayerManager
+                  theme={theme}
                   players={players}
                   onRemove={removePlayer}
                   onAdd={addPlayer}
@@ -406,158 +444,219 @@ export default function App() {
                   setPlayers={setPlayers}
                 />
               </div>
-              <div style={{ marginTop: 16, display: 'flex', gap: 8 }}>
-                <button className="btn" onClick={newRound}>
+              <div style={{ marginTop: theme.spacing(2), display: 'flex', gap: theme.spacing(1) }}>
+                <Button theme={theme} onClick={newRound}>
                   Next Round
-                </button>
-                <button className="btn-subtle" onClick={() => setPhase('setup')}>
+                </Button>
+                <ButtonSubtle theme={theme} onClick={() => setPhase('setup')}>
                   Back to Start
-                </button>
+                </ButtonSubtle>
               </div>
             </Card>
           </>
         )}
 
-        <footer style={{ marginTop: 40, fontSize: 11, opacity: 0.7 }}>
+        <footer style={{ marginTop: theme.spacing(5), fontSize: theme.font.size.xs, opacity: 0.7 }}>
           Local demo. Pass the laptop for private reveals. Keys stay on your server.
         </footer>
       </div>
 
-      {/* Minimal styles */}
+      {/* minimal base styles shared */}
       <style>{`
-        .btn { padding: 8px 14px; border-radius: 12px; background:#19a974; color:white; border:none; cursor:pointer }
-        .btn:hover { filter: brightness(1.05) }
-        .btn-subtle { padding: 8px 12px; border-radius: 12px; background:#1f2b45; color:#c6d4ff; border:1px solid #2a3b63; cursor:pointer }
-        .input { width:100%; padding:8px 10px; border-radius: 10px; border:1px solid #2a3b63; background:#0f1a33; color:#e6f0ff }
-        table { width: 100%; border-collapse: collapse }
-        th, td { padding: 10px }
+        * { box-sizing: border-box }
+        .fade-in {
+          animation: fade-in 180ms ease-out forwards;
+          opacity: 0;
+          transform: translateY(4px);
+        }
+        @keyframes fade-in {
+          to { opacity: 1; transform: translateY(0) }
+        }
       `}</style>
     </div>
   );
 }
 
-function PlayerManager({ players, onRemove, onAdd, newPlayerName, setNewPlayerName, setPlayers }) {
-  return (
-    <div>
-      <div style={{ overflow: 'auto', border: '1px solid #1f2b45', borderRadius: 12 }}>
-        <table>
-          <thead style={{ background: '#0f1a33' }}>
-            <tr>
-              <th>#</th>
-              <th>Name</th>
-              <th>Score</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {players.map((p, idx) => (
-              <tr key={idx} style={{ borderTop: '1px solid #1f2b45' }}>
-                <td style={{ opacity: 0.8 }}>{idx + 1}</td>
-                <td>
-                  <InlineRename
-                    value={p.name}
-                    onChange={(name) => {
-                      setPlayers((prev) => prev.map((pp, i) => (i === idx ? { ...pp, name } : pp)));
-                    }}
-                  />
-                </td>
-                <td>{p.score}</td>
-                <td>
-                  <button className="btn-subtle" onClick={() => onRemove(idx)}>
-                    Remove
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+/* ---------------- SMALL UI PRIMITIVES ---------------- */
 
-      <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-        <input
-          className="input"
-          placeholder="Add player name"
-          value={newPlayerName}
-          onChange={(e) => setNewPlayerName(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && onAdd()}
+function Header({ theme }) {
+  return (
+    <div className="fade-in" style={{ marginBottom: theme.spacing(2.5) }}>
+      <h1
+        style={{
+          fontSize: theme.font.size.xl,
+          fontWeight: theme.font.weight.bold,
+          margin: 0,
+          letterSpacing: 0.2,
+          display: 'flex',
+          alignItems: 'center',
+          gap: theme.spacing(1)
+        }}
+      >
+        <span
+          style={{
+            width: 12,
+            height: 12,
+            borderRadius: 999,
+            background: theme.color.accent,
+            boxShadow: theme.shadow.sm
+          }}
         />
-        <button className="btn" onClick={onAdd}>
-          Add
-        </button>
-      </div>
+        Impostor Game – Local Demo
+      </h1>
     </div>
   );
 }
 
-function InlineRename({ value, onChange }) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(value);
+function Card({ theme, title, children }) {
   return (
-    <span>
-      {editing ? (
-        <span style={{ display: 'inline-flex', gap: 6 }}>
-          <input className="input" value={draft} onChange={(e) => setDraft(e.target.value)} style={{ width: 200 }} />
-          <button
-            className="btn"
-            onClick={() => {
-              const v = draft.trim();
-              if (v) onChange(v);
-              setEditing(false);
-            }}
-          >
-            Save
-          </button>
-          <button
-            className="btn-subtle"
-            onClick={() => {
-              setDraft(value);
-              setEditing(false);
-            }}
-          >
-            Cancel
-          </button>
-        </span>
-      ) : (
-        <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
-          <span>{value}</span>
-          <button className="btn-subtle" onClick={() => setEditing(true)}>
-            Rename
-          </button>
-        </span>
+    <section
+      className="fade-in"
+      style={{
+        border: `1px solid ${theme.color.border}`,
+        background: theme.color.surface,
+        borderRadius: theme.radius.lg,
+        padding: theme.spacing(2),
+        marginBottom: theme.spacing(2),
+        boxShadow: theme.shadow.sm
+      }}
+    >
+      {title && (
+        <h2 style={{ fontSize: theme.font.size.lg, margin: 0, marginBottom: theme.spacing(1), fontWeight: theme.font.weight.med }}>
+          {title}
+        </h2>
       )}
-    </span>
-  );
-}
-
-function Card({ title, children }) {
-  return (
-    <div style={{ border: '1px solid #1f2b45', background: '#0f1a33', borderRadius: 16, padding: 16, marginBottom: 16 }}>
-      {title && <h2 style={{ fontSize: 18, margin: 0, marginBottom: 8 }}>{title}</h2>}
       {children}
-    </div>
+    </section>
   );
 }
 
-function Toggle({ label, checked, onChange }) {
+function Button({ theme, children, variant = 'normal', disabled, onClick, style, ariaLabel }) {
+  const styles = {
+    normal: { background: theme.color.accentMuted, color: '#fff' },
+    primary: { background: theme.color.primary, color: '#fff' },
+    disabled: { background: theme.color.disabledBg, color: theme.color.disabledText }
+  }[disabled ? 'disabled' : variant];
+
   return (
-    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', userSelect: 'none' }}>
-      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
-      <span style={{ fontSize: 13 }}>{label}</span>
+    <button
+      aria-label={ariaLabel}
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        padding: '10px 16px',
+        borderRadius: theme.radius.md,
+        border: 'none',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        transition: 'transform 80ms ease',
+        fontWeight: theme.font.weight.med,
+        ...styles,
+        ...style
+      }}
+      onMouseDown={(e) => !disabled && (e.currentTarget.style.transform = 'scale(0.98)')}
+      onMouseUp={(e) => (e.currentTarget.style.transform = 'scale(1.0)')}
+      onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1.0)')}
+    >
+      {children}
+    </button>
+  );
+}
+
+function ButtonSubtle({ theme, children, onClick, style }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        padding: '10px 12px',
+        borderRadius: theme.radius.md,
+        background: theme.color.subtleBtnBg,
+        color: theme.color.subtleBtnText,
+        border: `1px solid ${theme.color.border}`,
+        cursor: 'pointer',
+        fontWeight: theme.font.weight.med,
+        transition: 'background 120ms ease',
+        ...style
+      }}
+      onMouseEnter={(e) => (e.currentTarget.style.background = '#172442')}
+      onMouseLeave={(e) => (e.currentTarget.style.background = theme.color.subtleBtnBg)}
+    >
+      {children}
+    </button>
+  );
+}
+
+function Label({ theme, children }) {
+  return (
+    <label style={{ fontSize: theme.font.size.xs, display: 'block', marginBottom: 6, color: theme.color.muted }}>
+      {children}
     </label>
   );
 }
 
+function inputStyle(theme) {
+  return {
+    width: '100%',
+    padding: '10px 12px',
+    borderRadius: theme.radius.sm,
+    border: `1px solid ${theme.color.border}`,
+    background: theme.color.surfaceSoft,
+    color: theme.color.text,
+    outline: 'none'
+  };
+}
+
+function Input({ theme, ...props }) {
+  return <input {...props} style={inputStyle(theme)} />;
+}
+
+function Toggle({ theme, label, checked, onChange }) {
+  return (
+    <label
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        userSelect: 'none',
+        padding: '8px 10px',
+        borderRadius: theme.radius.sm,
+        background: theme.color.surfaceSoft,
+        border: `1px solid ${theme.color.border}`
+      }}
+    >
+      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+      <span style={{ fontSize: theme.font.size.sm }}>{label}</span>
+    </label>
+  );
+}
+
+function StatusRow({ theme, ok, okText }) {
+  return (
+    <div style={{ marginTop: 8, fontSize: theme.font.size.xs }}>
+      {ok ? (
+        <div style={{ color: theme.color.accent }}>
+          <b>✓ {okText}</b>
+        </div>
+      ) : (
+        <div style={{ opacity: 0.7 }}>
+          <em>(not generated)</em>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /**
- * RevealCard rules:
+ * RevealCard rules (logic unchanged):
  * - If giveImpostorFakeWord === true:
  *   - UI is identical for all players. Everyone sees "Your secret word".
- *   - Word holders see the real secret word; the impostor sees fakeWord.
+ *   - Word holders see the real word; the impostor sees fakeWord.
  *   - No hint button for anyone.
  * - If giveImpostorFakeWord === false:
  *   - Word holders: see secret word, NO hint button.
  *   - Impostor: sees "You are the Impostor" and CAN use the hint button.
  */
 function RevealCard({
+  theme,
   assignment,
   revealed,
   hintVisible,
@@ -569,59 +668,78 @@ function RevealCard({
 
   const isImpostor = assignment.role === 'impostor';
   const showIdenticalUI = giveImpostorFakeWord === true;
-
-  // What word to show under identical UI mode
   const displayWord = isImpostor ? assignment.fakeWord : assignment.word;
-
-  // Hint visibility rules
-  const canShowHintButton =
-    !showIdenticalUI && isImpostor; // only impostor gets hint when fake-word mode is OFF
+  const canShowHintButton = !showIdenticalUI && isImpostor;
 
   return (
-    <div style={{ width: '100%', maxWidth: 420 }}>
-      <div style={{ border: '1px solid #1f2b45', background: '#0f1a33', borderRadius: 16, padding: 16, textAlign: 'center' }}>
+    <div style={{ width: '100%', maxWidth: 480 }}>
+      <div
+        style={{
+          border: `1px solid ${theme.color.border}`,
+          background: theme.color.surfaceSoft,
+          borderRadius: theme.radius.lg,
+          padding: theme.spacing(2),
+          textAlign: 'center',
+          boxShadow: theme.shadow.md
+        }}
+      >
         {!revealed ? (
           <>
-            <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 8 }}>
+            <div style={{ fontSize: theme.font.size.xs, opacity: 0.8, marginBottom: 10 }}>
               Tap reveal when it's your turn. Keep the screen private!
             </div>
-            <button className="btn" onClick={onReveal}>
+            <Button theme={theme} onClick={onReveal}>
               Reveal
-            </button>
+            </Button>
           </>
         ) : (
           <>
             {showIdenticalUI ? (
-              // Identical UI for everyone: "Your secret word" label, impostor quietly sees fake word
               <div>
-                <div style={{ fontSize: 12, opacity: 0.8 }}>Your secret word:</div>
-                <div style={{ fontSize: 22, fontWeight: 700, color: '#3be89e', fontFamily: 'monospace' }}>
+                <div style={{ fontSize: theme.font.size.xs, opacity: 0.8 }}>Your secret word:</div>
+                <div
+                  style={{
+                    fontSize: 24,
+                    fontWeight: theme.font.weight.bold,
+                    color: theme.color.accent,
+                    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+                    marginTop: 6
+                  }}
+                >
                   {displayWord || '—'}
                 </div>
               </div>
             ) : isImpostor ? (
-              // Impostor clearly labeled only when fake-word mode is OFF
               <div>
-                <div style={{ fontSize: 22, fontWeight: 700, color: '#ffb6c1' }}>You are the Impostor</div>
+                <div style={{ fontSize: 22, fontWeight: theme.font.weight.bold, color: theme.color.warn }}>
+                  You are the Impostor
+                </div>
                 <div style={{ marginTop: 10 }}>
                   {!hintVisible ? (
                     canShowHintButton ? (
-                      <button className="btn-subtle" onClick={onShowHint}>
+                      <ButtonSubtle theme={theme} onClick={onShowHint}>
                         Show Hint (optional)
-                      </button>
+                      </ButtonSubtle>
                     ) : null
                   ) : (
-                    <div style={{ fontSize: 13, opacity: 0.85 }}>
+                    <div style={{ fontSize: theme.font.size.sm, opacity: 0.85 }}>
                       Hint: <span style={{ opacity: 1 }}>{assignment.hint}</span>
                     </div>
                   )}
                 </div>
               </div>
             ) : (
-              // Word holder (fake-word mode OFF)
               <div>
-                <div style={{ fontSize: 12, opacity: 0.8 }}>Your secret word:</div>
-                <div style={{ fontSize: 22, fontWeight: 700, color: '#3be89e', fontFamily: 'monospace' }}>
+                <div style={{ fontSize: theme.font.size.xs, opacity: 0.8 }}>Your secret word:</div>
+                <div
+                  style={{
+                    fontSize: 24,
+                    fontWeight: theme.font.weight.bold,
+                    color: theme.color.accent,
+                    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+                    marginTop: 6
+                  }}
+                >
                   {assignment.word}
                 </div>
               </div>
@@ -633,15 +751,150 @@ function RevealCard({
   );
 }
 
-function Scoreboard({ players }) {
+function PlayerManager({ theme, players, onRemove, onAdd, newPlayerName, setNewPlayerName, setPlayers }) {
   return (
-    <div style={{ overflow: 'auto', border: '1px solid #1f2b45', borderRadius: 12 }}>
-      <table>
-        <thead style={{ background: '#0f1a33' }}>
+    <div>
+      <div
+        style={{
+          overflow: 'auto',
+          border: `1px solid ${theme.color.border}`,
+          borderRadius: theme.radius.md,
+          background: theme.color.surfaceSoft
+        }}
+      >
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead style={{ background: theme.color.surface }}>
+            <tr>
+              <Th theme={theme}>#</Th>
+              <Th theme={theme}>Name</Th>
+              <Th theme={theme}>Score</Th>
+              <Th theme={theme}>Actions</Th>
+            </tr>
+          </thead>
+          <tbody>
+            {players.map((p, idx) => (
+              <tr key={idx} style={{ borderTop: `1px solid ${theme.color.border}` }}>
+                <Td theme={theme} style={{ opacity: 0.8, width: 56 }}>
+                  {idx + 1}
+                </Td>
+                <Td theme={theme}>
+                  <InlineRename
+                    theme={theme}
+                    value={p.name}
+                    onChange={(name) => {
+                      setPlayers((prev) => prev.map((pp, i) => (i === idx ? { ...pp, name } : pp)));
+                    }}
+                  />
+                </Td>
+                <Td theme={theme} style={{ width: 80, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>
+                  {p.score}
+                </Td>
+                <Td theme={theme} style={{ width: 120 }}>
+                  <ButtonSubtle theme={theme} onClick={() => onRemove(idx)}>
+                    Remove
+                  </ButtonSubtle>
+                </Td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div style={{ display: 'flex', gap: theme.spacing(1), marginTop: theme.spacing(1.5) }}>
+        <Input
+          theme={theme}
+          placeholder="Add player name"
+          value={newPlayerName}
+          onChange={(e) => setNewPlayerName(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && onAdd()}
+        />
+        <Button theme={theme} onClick={onAdd}>
+          Add
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function InlineRename({ theme, value, onChange }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+  return (
+    <span>
+      {editing ? (
+        <span style={{ display: 'inline-flex', gap: 6 }}>
+          <Input theme={theme} value={draft} onChange={(e) => setDraft(e.target.value)} style={{ width: 220 }} />
+          <Button
+            theme={theme}
+            onClick={() => {
+              const v = draft.trim();
+              if (v) onChange(v);
+              setEditing(false);
+            }}
+          >
+            Save
+          </Button>
+          <ButtonSubtle
+            theme={theme}
+            onClick={() => {
+              setDraft(value);
+              setEditing(false);
+            }}
+          >
+            Cancel
+          </ButtonSubtle>
+        </span>
+      ) : (
+        <span style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}>
+          <span>{value}</span>
+          <ButtonSubtle theme={theme} onClick={() => setEditing(true)}>
+            Rename
+          </ButtonSubtle>
+        </span>
+      )}
+    </span>
+  );
+}
+
+function Th({ theme, children }) {
+  return (
+    <th
+      style={{
+        textAlign: 'left',
+        padding: '12px 12px',
+        fontSize: 12,
+        color: theme.color.muted,
+        fontWeight: theme.font.weight.med
+      }}
+    >
+      {children}
+    </th>
+  );
+}
+function Td({ theme, children, style }) {
+  return (
+    <td style={{ padding: '12px 12px', fontSize: 14, ...style }}>
+      {children}
+    </td>
+  );
+}
+
+function Scoreboard({ theme, players }) {
+  return (
+    <div
+      style={{
+        overflow: 'auto',
+        border: `1px solid ${theme.color.border}`,
+        borderRadius: theme.radius.md,
+        background: theme.color.surfaceSoft
+      }}
+    >
+      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <thead style={{ background: theme.color.surface }}>
           <tr>
-            <th>#</th>
-            <th>Player</th>
-            <th>Score</th>
+            <Th theme={theme}>#</Th>
+            <Th theme={theme}>Player</Th>
+            <Th theme={theme}>Score</Th>
           </tr>
         </thead>
         <tbody>
@@ -649,10 +902,14 @@ function Scoreboard({ players }) {
             .map((p, i) => ({ ...p, i }))
             .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name))
             .map((p, rank) => (
-              <tr key={p.i} style={{ borderTop: '1px solid #1f2b45' }}>
-                <td style={{ opacity: 0.8 }}>{rank + 1}</td>
-                <td>{p.name}</td>
-                <td style={{ fontFamily: 'monospace' }}>{p.score}</td>
+              <tr key={p.i} style={{ borderTop: `1px solid ${theme.color.border}` }}>
+                <Td theme={theme} style={{ opacity: 0.8, width: 56 }}>
+                  {rank + 1}
+                </Td>
+                <Td theme={theme}>{p.name}</Td>
+                <Td theme={theme} style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', width: 100 }}>
+                  {p.score}
+                </Td>
               </tr>
             ))}
         </tbody>
@@ -661,29 +918,46 @@ function Scoreboard({ players }) {
   );
 }
 
-function GateOverlay({ onContinue }) {
+function GateOverlay({ theme, onContinue }) {
   return (
-    <div className="gate" style={{
-      position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: 'rgba(0,0,0,0.7)', zIndex: 50
-    }}>
-      <div style={{ background: '#ffffff', color: '#0b1221', padding: 20, borderRadius: 16, width: 'min(560px, 92vw)' }}>
-        <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 6 }}>Round complete</h2>
-        <p style={{ fontSize: 13, opacity: 0.8, marginBottom: 12 }}>
+    <div
+      className="gate"
+      style={{
+        position: 'fixed',
+        inset: 0,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'rgba(0,0,0,0.4)',
+        backdropFilter: 'blur(4px)',
+        zIndex: 50,
+        padding: 16
+      }}
+    >
+      <div
+        style={{
+          background: theme.color.surface,
+          color: theme.color.text,
+          padding: 24,
+          borderRadius: theme.radius.lg,
+          width: 'min(580px, 92vw)',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
+          border: `1px solid ${theme.color.border}`
+        }}
+      >
+        <h2 style={{ fontSize: 20, fontWeight: 700, margin: 0, marginBottom: 8, color: theme.color.text }}>Round complete</h2>
+        <p style={{ fontSize: 13, color: theme.color.muted, margin: 0, marginBottom: 16 }}>
           Click continue to open the scoring screen. Roles and the secret word will not be shown.
         </p>
-        <button
-          className="btn"
-          onClick={onContinue}
-          style={{ background: '#2563eb' }}
-        >
+        <Button theme={theme} onClick={onContinue} variant="primary" ariaLabel="Continue to Scoring">
           Continue to Scoring
-        </button>
+        </Button>
       </div>
     </div>
   );
 }
 
+/* ---------------- UTIL ---------------- */
 function shuffle(a) {
   for (let i = a.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));

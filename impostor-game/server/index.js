@@ -63,7 +63,7 @@ Some more examples:
         { role: 'system', content: system },
         { role: 'user', content: userPrompt }
       ],
-      temperature: 2
+      temperature: 1.2
     });
 
     const raw = chat.choices?.[0]?.message?.content ?? '{}';
@@ -72,8 +72,8 @@ Some more examples:
     try { data = JSON.parse(raw); } catch { data = {}; }
 
     // Fallbacks
-    if (!data.word) data.word = 'aurora';
-    if (!data.hint) data.hint = `Common but not the first guess (${String(data.word).length} letters)`;
+    if (!data.word) data.word = 'bruh';
+    if (!data.hint) data.hint = `this shit broke)`;
     if (!giveImpostorFakeWord) data.fakeWord = null;
     if (data.fakeWord === undefined) data.fakeWord = giveImpostorFakeWord ? null : null;
 
